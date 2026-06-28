@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scientific Calculator</title>
+  <style>
+    :root {
+      --bg:        #0e0e1a;
+      --surface:   #161628;
+      --panel:     #1c1c35;
+      --display:   #12122a;
+      --accent:    #7c3aed;
+      --accent2:   #06b6d4;
+      --danger:    #e94560;
+      --success:   #10b981;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --border:    rgba(255,255,255,0.06);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 28px;
+      color: var(--accent2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 span { color: var(--muted); font-size: 13px; font-weight: 400; }
+
+    .layout {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    /* ── Calculator ───────────────────────────── */
+    .calculator {
+      flex: 0 0 360px;
+      background: var(--surface);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      border: 1px solid var(--border);
+    }
+
+    .display {
+      background: var(--display);
+      border-radius: 16px;
+      padding: 20px 18px 14px;
+      margin-bottom: 18px;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .display .expr {
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 18px;
+      margin-bottom: 6px;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .display .value {
+      font-size: 38px;
+      font-weight: 300;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.2s;
+    }
+
+    .display .value.error { color: var(--danger); font-size: 24px; }
+    .display .value.loading { color: var(--accent2); }
+
+    .display .api-label {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      font-size: 10px;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      opacity: 0.7;
+    }
+
+    /* Mode toggle */
+    .mode-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .mode-row button {
+      flex: 1;
+      padding: 7px 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--panel);
+      color: var(--muted);
+    }
+
+    .mode-row button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Button grid */
+    .sci-section { margin-bottom: 10px; }
+
+    .row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .row button { flex: 1; }
+
+    button.calc-btn {
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 14px 4px;
+      cursor: pointer;
+      transition: transform 0.1s, filter 0.1s, background 0.15s;
+      position: relative;
+    }
+
+    button.calc-btn:active { transform: scale(0.92); }
+    button.calc-btn:hover { filter: brightness(1.15); }
+
+    .btn-num { background: var(--panel); color: var(--text); }
+    .btn-op  { background: var(--danger); color: #fff; }
+    .btn-fn  { background: #1e3a5f; color: var(--accent2); font-size: 12px; }
+    .btn-clear { background: #3b1f6e; color: #c4b5fd; }
+    .btn-eq  { background: var(--success); color: #fff; flex: 2 !important; }
+    .btn-zero { flex: 2 !important; }
+
+    /* ── Side panel ───────────────────────────── */
+    .side {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 18px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-header .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent2);
+    }
+
+    /* API Log */
+    .log-body {
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-entry {
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      border-left: 3px solid var(--accent);
+      background: var(--panel);
+      animation: fadeIn 0.2s ease;
+    }
+
+    .log-entry.err { border-left-color: var(--danger); }
+
+    .log-entry .method {
+      font-size: 10px;
+      color: var(--accent2);
+      margin-bottom: 2px;
+    }
+
+    .log-entry .req { color: var(--muted); }
+    .log-entry .res { color: var(--text); margin-top: 3px; }
+    .log-entry .res.ok { color: #6ee7b7; }
+    .log-entry .res.err { color: var(--danger); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* History */
+    .history-body {
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 10px 12px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 6px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.1s;
+    }
+
+    .history-item:hover { background: var(--panel); }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .h-expr { color: var(--muted); font-size: 11px; }
+    .history-item .h-val { color: var(--accent2); font-weight: 600; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 2px solid var(--accent2);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty { color: var(--muted); font-size: 12px; text-align: center; padding: 16px; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    @media (max-width: 680px) {
+      .layout { flex-direction: column; align-items: stretch; }
+      .calculator { flex: none; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>⟨/⟩ Scientific Calculator API <span>· .NET 8</span></h1>
+
+<div class="layout">
+
+  <!-- ── CALCULATOR ── -->
+  <div class="calculator">
+    <div class="display">
+      <div class="api-label">API</div>
+      <div class="expr" id="expr"></div>
+      <div class="value" id="value">0</div>
+    </div>
+
+    <div class="mode-row">
+      <button id="deg-btn" class="active" onclick="setMode('deg')">DEG</button>
+      <button id="rad-btn" onclick="setMode('rad')">RAD</button>
+    </div>
+
+    <!-- Scientific functions -->
+    <div class="sci-section">
+      <div class="row">
+        <button class="calc-btn btn-fn" onclick="callUnary('sin')">sin</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('cos')">cos</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('tan')">tan</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('log')">log</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('ln')">ln</button>
+      </div>
+      <div class="row">
+        <button class="calc-btn btn-fn" onclick="callUnary('asin')">sin⁻¹</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('acos')">cos⁻¹</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('atan')">tan⁻¹</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('sqrt')">√</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('square')">x²</button>
+      </div>
+      <div class="row">
+        <button class="calc-btn btn-fn" onclick="insertConst(Math.PI, 'π')">π</button>
+        <button class="calc-btn btn-fn" onclick="insertConst(Math.E, 'e')">e</button>
+        <button class="calc-btn btn-fn" onclick="startPow()">xʸ</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('abs')">|x|</button>
+        <button class="calc-btn btn-fn" onclick="callUnary('reciprocal')">1/x</button>
+      </div>
+    </div>
+
+    <!-- Basic -->
+    <div class="row">
+      <button class="calc-btn btn-clear" onclick="clearAll()">AC</button>
+      <button class="calc-btn btn-clear" onclick="callUnary('negate')">+/-</button>
+      <button class="calc-btn btn-clear" onclick="callUnary('percent')">%</button>
+      <button class="calc-btn btn-op"   onclick="setOp('divide')">÷</button>
+    </div>
+    <div class="row">
+      <button class="calc-btn btn-num" onclick="digit('7')">7</button>
+      <button class="calc-btn btn-num" onclick="digit('8')">8</button>
+      <button class="calc-btn btn-num" onclick="digit('9')">9</button>
+      <button class="calc-btn btn-op"  onclick="setOp('multiply')">×</button>
+    </div>
+    <div class="row">
+      <button class="calc-btn btn-num" onclick="digit('4')">4</button>
+      <button class="calc-btn btn-num" onclick="digit('5')">5</button>
+      <button class="calc-btn btn-num" onclick="digit('6')">6</button>
+      <button class="calc-btn btn-op"  onclick="setOp('subtract')">−</button>
+    </div>
+    <div class="row">
+      <button class="calc-btn btn-num" onclick="digit('1')">1</button>
+      <button class="calc-btn btn-num" onclick="digit('2')">2</button>
+      <button class="calc-btn btn-num" onclick="digit('3')">3</button>
+      <button class="calc-btn btn-op"  onclick="setOp('add')">+</button>
+    </div>
+    <div class="row">
+      <button class="calc-btn btn-num btn-zero" onclick="digit('0')">0</button>
+      <button class="calc-btn btn-num" onclick="dot()">.</button>
+      <button class="calc-btn btn-eq"  onclick="calculate()">=</button>
+    </div>
+  </div>
+
+  <!-- ── SIDE PANEL ── -->
+  <div class="side">
+
+    <!-- API Log -->
+    <div class="card">
+      <div class="card-header"><span class="dot"></span> API Log</div>
+      <div class="log-body" id="log-body">
+        <div class="empty">No requests yet.</div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-header"><span class="dot" style="background:var(--accent)"></span> History</div>
+      <div class="history-body" id="history-body">
+        <div class="empty">No history yet.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const BASE = '';   // same origin
+
+  // State
+  let current = '0';
+  let prev    = '';
+  let op      = null;
+  let mode    = 'deg';
+  let resetNext = false;
+
+  const valueEl   = document.getElementById('value');
+  const exprEl    = document.getElementById('expr');
+  const logBody   = document.getElementById('log-body');
+  const histBody  = document.getElementById('history-body');
+
+  const opLabels = { add:'+', subtract:'−', multiply:'×', divide:'÷', power:'^' };
+
+  // ── Display ─────────────────────────────────────────────────────────────
+  function setDisplay(val, isError = false, isLoading = false) {
+    current = String(val);
+    valueEl.textContent = current;
+    valueEl.className = 'value' + (isError ? ' error' : isLoading ? ' loading' : '');
+  }
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('deg-btn').className = m === 'deg' ? 'active' : '';
+    document.getElementById('rad-btn').className = m === 'rad' ? 'active' : '';
+  }
+
+  // ── Input ────────────────────────────────────────────────────────────────
+  function digit(d) {
+    if (resetNext) { current = d; resetNext = false; }
+    else current = current === '0' ? d : current + d;
+    setDisplay(current);
+  }
+
+  function dot() {
+    if (resetNext) { current = '0.'; resetNext = false; }
+    else if (!current.includes('.')) current += '.';
+    setDisplay(current);
+  }
+
+  function insertConst(val, label) {
+    current = String(parseFloat(val.toFixed(10)));
+    exprEl.textContent = label;
+    resetNext = true;
+    setDisplay(current);
+  }
+
+  function clearAll() {
+    current = '0'; prev = ''; op = null; resetNext = false;
+    exprEl.textContent = '';
+    setDisplay('0');
+  }
+
+  function setOp(o) {
+    if (op && !resetNext) { calculate(true); }
+    prev = current; op = o; resetNext = true;
+    exprEl.textContent = `${prev} ${opLabels[o]}`;
+  }
+
+  function startPow() { setOp('power'); }
+
+  // ── API calls ────────────────────────────────────────────────────────────
+  async function post(endpoint, body) {
+    setDisplay('...', false, true);
+    const t0 = Date.now();
+    try {
+      const res = await fetch(`${BASE}/api/calculator/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      const ms = Date.now() - t0;
+      addLog(endpoint, body, data, ms);
+      return data;
+    } catch (e) {
+      const errData = { success: false, error: 'Network error: ' + e.message };
+      addLog(endpoint, body, errData, Date.now() - t0);
+      return errData;
+    }
+  }
+
+  async function callUnary(fn) {
+    const x = parseFloat(current);
+    const body = ['sin','cos','tan','asin','acos','atan'].includes(fn)
+      ? { x, mode: mode.charAt(0).toUpperCase() + mode.slice(1) }
+      : { x };
+
+    const label = { sin:'sin', cos:'cos', tan:'tan', asin:'sin⁻¹', acos:'cos⁻¹',
+                    atan:'tan⁻¹', log:'log', ln:'ln', sqrt:'√', square:'square',
+                    abs:'|', reciprocal:'1/', negate:'-', percent:'%' };
+
+    exprEl.textContent = `${label[fn]}(${x})`;
+    const data = await post(fn, body);
+
+    if (data.success) {
+      addHistory(`${label[fn]}(${x})`, data.value);
+      setDisplay(fmt(data.value));
+    } else {
+      setDisplay(data.error, true);
+    }
+    resetNext = true;
+  }
+
+  async function calculate(chained = false) {
+    if (!op || !prev) return;
+    const a = parseFloat(prev), b = parseFloat(current);
+
+    let body, endpoint;
+    if (op === 'power') {
+      body = { base: a, exponent: b };
+      endpoint = 'power';
+    } else {
+      body = { a, b };
+      endpoint = op;
+    }
+
+    if (!chained) exprEl.textContent = `${prev} ${opLabels[op]} ${current} =`;
+
+    const data = await post(endpoint, body);
+
+    if (data.success) {
+      if (!chained) addHistory(`${prev} ${opLabels[op]} ${current}`, data.value);
+      setDisplay(fmt(data.value));
+    } else {
+      setDisplay(data.error, true);
+    }
+    op = null; prev = ''; resetNext = true;
+  }
+
+  // ── Formatting ───────────────────────────────────────────────────────────
+  function fmt(n) {
+    if (n === null || n === undefined) return 'Error';
+    const r = parseFloat(n.toFixed(10));
+    return String(r);
+  }
+
+  // ── Log ──────────────────────────────────────────────────────────────────
+  function addLog(endpoint, reqBody, data, ms) {
+    const first = logBody.querySelector('.empty');
+    if (first) first.remove();
+
+    const entry = document.createElement('div');
+    entry.className = 'log-entry' + (data.success ? '' : ' err');
+    entry.innerHTML = `
+      <div class="method">POST /api/calculator/${endpoint} · ${ms}ms</div>
+      <div class="req">↑ ${JSON.stringify(reqBody)}</div>
+      <div class="res ${data.success ? 'ok' : 'err'}">↓ ${
+        data.success
+          ? JSON.stringify({ success: true, value: data.value })
+          : JSON.stringify({ success: false, error: data.error })
+      }</div>`;
+    logBody.prepend(entry);
+  }
+
+  // ── History ──────────────────────────────────────────────────────────────
+  function addHistory(expr, value) {
+    const first = histBody.querySelector('.empty');
+    if (first) first.remove();
+
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `<span class="h-expr">${expr}</span><span class="h-val">${fmt(value)}</span>`;
+    item.onclick = () => { setDisplay(fmt(value)); resetNext = true; exprEl.textContent = expr + ' ='; };
+    histBody.prepend(item);
+  }
+
+  // ── Keyboard ─────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key >= '0' && e.key <= '9') digit(e.key);
+    else if (e.key === '.') dot();
+    else if (e.key === '+') setOp('add');
+    else if (e.key === '-') setOp('subtract');
+    else if (e.key === '*') setOp('multiply');
+    else if (e.key === '/') { e.preventDefault(); setOp('divide'); }
+    else if (e.key === '^') setOp('power');
+    else if (e.key === 'Enter' || e.key === '=') calculate();
+    else if (e.key === 'Escape') clearAll();
+    else if (e.key === 'Backspace') {
+      if (current !== 'Error') {
+        current = current.length > 1 ? current.slice(0, -1) : '0';
+        setDisplay(current);
+      }
+    }
+  });
+</script>
+</body>
+</html>
